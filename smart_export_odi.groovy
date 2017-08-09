@@ -14,14 +14,11 @@ import oracle.odi.core.persistence.transaction.ITransactionManager;
 import oracle.odi.core.persistence.transaction.ITransactionStatus;
 import oracle.odi.domain.project.OdiProject;
 import oracle.odi.domain.project.OdiFolder;
-
 import oracle.odi.domain.project.finder.IOdiFolderFinder;
-
 import oracle.odi.impexp.smartie.ISmartExportService;
 import oracle.odi.impexp.smartie.ISmartExportable;
 import oracle.odi.impexp.smartie.impl.SmartExportServiceImpl;
 import oracle.odi.impexp.EncodingOptions;
-
 import java.util.logging.Logger
 
 Logger logger = Logger.getLogger("")
@@ -32,9 +29,8 @@ String exportFolderName = 'C:\\Users\\arjunl\\Documents\\odi\\odi_sdk_automation
 Date exportStartTime = new Date();
 
 //Create file for exporting metadata
-String fileName = exportFolderName + exportStartTime.format('yyyyMMdd') + 'ExportMetaData' + '.dat';
-def exportFileList = new File(fileName);
-exportFileList.write 'Working with files the Groovy way is easy.\n';
+def exportMetaDataFile = new File(exportFolderName + 'ExportMetaData' + '.dat');
+exportMetaDataFile.write ""
 EncodingOptions encodeOptions = new EncodingOptions();
 
 def objectExportResultMap = new HashMap < String, Expando > ();
@@ -92,10 +88,12 @@ try {
 			tempList.add(exportObject.value.qualifiedObject);
 			println "Exporting: " + exportObject.value.qualifiedObject 
 			try {
-				smartExpSvc.exportToXml(tempList,exportFolderName,exportObject.value.exportFileName,true,false,encodeOptions,false,null);
+				//smartExpSvc.exportToXml(tempList,exportFolderName,exportObject.value.exportFileName,true,false,encodeOptions,false,null);
 				exportObject.value.result = "Export Successful"
+				exportObject.value.exportedSuccessfully =true
 			}
 			catch (Exception e){
+				exportObject.value.exportedSuccessfully =false
 				exportObject.value.result = "Found the object unable to export see exception"
 				throw e;
 			}
@@ -104,6 +102,7 @@ try {
 		{
 			println "Unable to find: " + exportObject.value.srcFolderName 
 			exportObject.value.result = "Unable to find the object"
+			exportObject.value.exportedSuccessfully =false
 		}
     }
 	println "Export Complete: " +  new Date();
@@ -111,10 +110,11 @@ try {
 	println "Result: \n\t" + objectExportResultMap
     //Commit transaction, Close Aithentication and ODI Instance
     tm.commit(txnStatus);
-    
-    //auth.close();
-    //println "after auth close";
-    //odiInstance.close();
+    objectExportResultMap.each {
+		exportObject ->
+		exportMetaDataFile.append exportObject.value.srcFolderName+','+exportObject.value.exportedSuccessfully+','+exportObject.value.exportFileName+','+exportObject.value.result+System.getProperty("line.separator");
+	}
+	
 } catch (Exception e) {
 
     //Commit transaction, Close Aithentication and ODI Instance in Exception Block
