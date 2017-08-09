@@ -1,11 +1,10 @@
 //Created by ODI Studio
 /*Use this to run this file in ODI studio
-//evaluate(new File("C:\\Users\\arjunl\\Documents\\odi\\smart_export_odi.groovy"))
+//evaluate(new File("C:\\Users\\arjunl\\Documents\\GitHub\\odiscripts\\smart_export_odi.groovy"))
 */
 
 import oracle.odi.core.config.MasterRepositoryDbInfo;
 import oracle.odi.core.config.WorkRepositoryDbInfo;
-import oracle.odi.core.config.PoolingAttributes;
 import oracle.odi.core.OdiInstance;
 import oracle.odi.core.config.OdiInstanceConfig;
 import oracle.odi.core.security.Authentication;
@@ -13,27 +12,10 @@ import oracle.odi.core.persistence.transaction.ITransactionDefinition;
 import oracle.odi.core.persistence.transaction.support.DefaultTransactionDefinition;
 import oracle.odi.core.persistence.transaction.ITransactionManager;
 import oracle.odi.core.persistence.transaction.ITransactionStatus;
-
 import oracle.odi.domain.project.OdiProject;
 import oracle.odi.domain.project.OdiFolder;
 
 import oracle.odi.domain.project.finder.IOdiFolderFinder;
-import oracle.odi.domain.project.finder.IOdiInterfaceFinder;
-import oracle.odi.domain.model.finder.IOdiDataStoreFinder;
-import oracle.odi.domain.topology.OdiContext;
-import oracle.odi.domain.model.OdiDataStore; 
-import oracle.odi.domain.project.OdiFolder;
-import oracle.odi.domain.project.OdiInterface;
-import oracle.odi.domain.project.interfaces.DataSet;
-import oracle.odi.interfaces.interactive.support.InteractiveInterfaceHelperWithActions;
-import oracle.odi.interfaces.interactive.support.actions.InterfaceActionAddSourceDataStore;
-import oracle.odi.interfaces.interactive.support.actions.InterfaceActionSetTargetDataStore;
-import oracle.odi.interfaces.interactive.support.actions.InterfaceActionOnTargetDataStoreComputeAutoMapping;
-import oracle.odi.interfaces.interactive.support.aliascomputers.AliasComputerDoubleChecker;
-import oracle.odi.interfaces.interactive.support.clauseimporters.ClauseImporterDefault;
-import oracle.odi.interfaces.interactive.support.mapping.automap.AutoMappingComputerColumnName;
-import oracle.odi.interfaces.interactive.support.mapping.matchpolicy.MappingMatchPolicyColumnName;
-import oracle.odi.interfaces.interactive.support.targetkeychoosers.TargetKeyChooserPrimaryKey;
 
 import oracle.odi.impexp.smartie.ISmartExportService;
 import oracle.odi.impexp.smartie.ISmartExportable;
@@ -43,79 +25,102 @@ import oracle.odi.impexp.EncodingOptions;
 import java.util.logging.Logger
 
 Logger logger = Logger.getLogger("")
-logger.info ("I am a test info log")
+logger.info("I am a test info log")
 String PROJECT_CODE = 'BIAPPS';
 String folderListFile = 'C:\\Users\\arjunl\\Documents\\odi\\folderlist.txt';
-String exportFolderName= 'C:\\Users\\arjunl\\Documents\\odi\\odi_sdk_automation';
+String exportFolderName = 'C:\\Users\\arjunl\\Documents\\odi\\odi_sdk_automationtest\\';
+Date exportStartTime = new Date();
 
+//Create file for exporting metadata
+String fileName = exportFolderName + exportStartTime.format('yyyyMMdd') + 'ExportMetaData' + '.dat';
+def exportFileList = new File(fileName);
+exportFileList.write 'Working with files the Groovy way is easy.\n';
+EncodingOptions encodeOptions = new EncodingOptions();
 
+def objectExportResultMap = new HashMap < String, Expando > ();
+def objectExportResult = new Expando()
+
+println "Starting Process: " + exportStartTime
 
 try {
 
-//Create list objects for export 
+    //Create list objects for export 
 
-def foldersList = []
-new File(folderListFile).eachLine { line ->
-    foldersList << line
-}
+    //def foldersList = []
+    new File(folderListFile).eachLine {
+        line ->
+            objectExportResult = new Expando();
+        objectExportResult.srcFolderName = line;
+		objectExportResult.exportFileName = line.replaceAll("\\s","")+".xml";
+        objectExportResultMap[line] = objectExportResult;
+    }
 
-println foldersList
+    //Transaction Instance
 
-//Transaction Instance
+    ITransactionDefinition txnDef = new DefaultTransactionDefinition();
+    ITransactionManager tm = odiInstance.getTransactionManager();
+    ITransactionStatus txnStatus = tm.getTransaction(txnDef);
 
-ITransactionDefinition txnDef = new DefaultTransactionDefinition();
-ITransactionManager tm = odiInstance.getTransactionManager();
-ITransactionStatus txnStatus = tm.getTransaction(txnDef);
+    //Create the smart export service
+    ISmartExportService smartExpSvc = new SmartExportServiceImpl(odiInstance);
+    Collection < OdiFolder > allFoldersMatchedByName = new LinkedList();
 
-//Create the smart export service
-ISmartExportService smartExpSvc = new SmartExportServiceImpl (odiInstance);
-Collection <OdiFolder> allFoldersMatchedByName = new LinkedList();
+    //SDK Folder Objects
+    //We create a map from objectExportResultMap contains expando object for each value entry
+    //Expando object stores the naame of the folder given in the input file 
+	//each matched object
+	//a final object which qualifies i.e. 
+    objectExportResultMap.each {
+        tempObject ->
+            Collection < OdiFolder > tempCollection = ((IOdiFolderFinder) odiInstance.getTransactionalEntityManager().getFinder(OdiFolder.class)).findByName(tempObject.value.srcFolderName, PROJECT_CODE);
+        allFoldersMatchedByName.addAll(tempCollection);
+		//Add all the matched folders to the 
+        objectExportResultMap[tempObject.value.srcFolderName].objectsMatchedbyName = tempCollection;
+		objectExportResultMap[tempObject.value.srcFolderName].objectsMatchedbyName.each {
+        matchedObject ->
+            if (matchedObject.getParentFolder().getName().startsWith("CUSTOM")) {
+				objectExportResultMap[tempObject.value.srcFolderName].qualifiedObject = matchedObject
+            }
+    };
+		
+    }
+    //export all objects in the map
+    objectExportResultMap.each {
+        exportObject ->
+        if (exportObject.value.qualifiedObject) {
+			tempList = new LinkedList();
+			tempList.add(exportObject.value.qualifiedObject);
+			println "Exporting: " + exportObject.value.qualifiedObject 
+			try {
+				smartExpSvc.exportToXml(tempList,exportFolderName,exportObject.value.exportFileName,true,false,encodeOptions,false,null);
+				exportObject.value.result = "Export Successful"
+			}
+			catch (Exception e){
+				exportObject.value.result = "Found the object unable to export see exception"
+				throw e;
+			}
+		}
+		else
+		{
+			println "Unable to find: " + exportObject.value.srcFolderName 
+			exportObject.value.result = "Unable to find the object"
+		}
+    }
+	println "Export Complete: " +  new Date();
+	
+	println "Result: \n\t" + objectExportResultMap
+    //Commit transaction, Close Aithentication and ODI Instance
+    tm.commit(txnStatus);
+    
+    //auth.close();
+    //println "after auth close";
+    //odiInstance.close();
+} catch (Exception e) {
 
-//SDK Folder Objects
+    //Commit transaction, Close Aithentication and ODI Instance in Exception Block
 
-foldersList.each{ folderName ->
-allFoldersMatchedByName.addAll(((IOdiFolderFinder)odiInstance.getTransactionalEntityManager().getFinder(OdiFolder.class)).findByName(folderName,PROJECT_CODE));
-}
-println "All folder matched by name "+allFoldersMatchedByName.size()+" "+allFoldersMatchedByName;
-
-List <OdiFolder> qualifiedFoldersList = new LinkedList();
-
-allFoldersMatchedByName.each{ folder -> 
-	if(folder.getParentFolder().getName().startsWith("CUSTOM"))
-	{
-		qualifiedFoldersList.add(folder);
-	}
-};
-
-//Convert collection to List
-println "All folders which are Qualified "+qualifiedFoldersList.size() +" "+qualifiedFoldersList;
-
-println "sarting export";
-EncodingOptions encodeOptions= new  EncodingOptions();
-
-qualifiedFoldersList.each { folder ->
-	tempList = new LinkedList();
-	tempList.add(folder);
-	smartExpSvc.exportToXml(tempList,exportFolderName,folder.getName()+".xml",true,false,encodeOptions,false,null);
-}
-//export all objects in the list
-
-
-//Commit transaction, Close Aithentication and ODI Instance
-
-tm.commit(txnStatus);
-println "after commit";
-//auth.close();
-println "after auth close";
-//odiInstance.close();
-
-} 
-catch (Exception e)
-{
-
-//Commit transaction, Close Aithentication and ODI Instance in Exception Block
-
-  //auth.close();
-  //odiInstance.close();
-  println(e);
+    //auth.close();
+    //odiInstance.close();
+	println "Result: \n\t" + objectExportResultMap
+    println(e);
 }
