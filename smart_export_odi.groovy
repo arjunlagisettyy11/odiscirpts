@@ -1,7 +1,6 @@
 //Created by ODI Studio
 /*Use this to run this file in ODI studio
 //evaluate(new File("C:\\Users\\arjunl\\Documents\\GitHub\\odiscripts\\smart_export_odi.groovy"))
-*/
 
 import oracle.odi.core.config.MasterRepositoryDbInfo;
 import oracle.odi.core.config.WorkRepositoryDbInfo;
@@ -91,6 +90,7 @@ try {
 				//smartExpSvc.exportToXml(tempList,exportFolderName,exportObject.value.exportFileName,true,false,encodeOptions,false,null);
 				exportObject.value.result = "Export Successful"
 				exportObject.value.exportedSuccessfully =true
+				exportObject.value.internalId = exportObject.value.qualifiedObject.getInternalId()
 			}
 			catch (Exception e){
 				exportObject.value.exportedSuccessfully =false
@@ -112,7 +112,9 @@ try {
     tm.commit(txnStatus);
     objectExportResultMap.each {
 		exportObject ->
-		exportMetaDataFile.append exportObject.value.srcFolderName+','+exportObject.value.exportedSuccessfully+','+exportObject.value.exportFileName+','+exportObject.value.result+System.getProperty("line.separator");
+		exportMetaDataFile.append exportObject.value.srcFolderName+','+exportObject.value.exportedSuccessfully+','+exportObject.value.exportFileName+','+exportObject.value.internalId+','+exportObject.value.result+','+exportStartTime+System.getProperty("line.separator")
+			
+			;
 	}
 	
 } catch (Exception e) {
