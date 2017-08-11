@@ -1,5 +1,5 @@
 //Created by ODI Studio
-/*Use this to run this file in ODI studio
+/*Use this to run this file in ODI studio*/
 //evaluate(new File("C:\\Users\\arjunl\\Documents\\GitHub\\odiscripts\\smart_export_odi.groovy"))
 
 import oracle.odi.core.config.MasterRepositoryDbInfo;
