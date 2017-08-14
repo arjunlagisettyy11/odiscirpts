@@ -1,6 +1,6 @@
 //Created by ODI Studio
 /*Use this to run this file in ODI studio*/
-//evaluate(new File("C:\\Users\\arjunl\\Documents\\GitHub\\odiscripts\\import_odi.groovy"))
+//evaluate(new File("C:\\Users\\arjunl\\Documents\\GitHub\\odiscripts\\delete_before_import_odi.groovy"))
 
 import oracle.odi.core.config.MasterRepositoryDbInfo;
 import oracle.odi.core.config.WorkRepositoryDbInfo;
@@ -23,12 +23,13 @@ import oracle.odi.domain.topology.OdiDataServer;
 import oracle.odi.core.config.MasterRepositoryDbInfo;
 import oracle.odi.domain.topology.finder.IOdiDataServerFinder;
 import oracle.odi.publicapi.samples.SimpleOdiInstanceHandle;
-
+import com.sunopsis.dwg.DwgObject as DwgObject;
 
 Logger logger = Logger.getLogger("")
 logger.info("I am a test info log")
 String PROJECT_CODE = 'BIAPPS';
 String ODI_DATA_SERVER = 'OBIA_BIA_ODIREPO';
+String odiUserConnectionDetailsDataServerName = 'UC_ADMIN_ODI_CONNECTION';
 String exportFolderName = 'C:\\Users\\arjunl\\Documents\\odi\\odi_sdk_automationtest\\';
 String exportMetaDataFileName = 'C:\\Users\\arjunl\\Documents\\odi\\odi_sdk_automationtest\\ExportMetaData3.dat';
 Date exportStartTime = new Date();
@@ -44,31 +45,13 @@ println "Starting Process: " + exportStartTime
 
 OdiDataServer odiRepoDataServer = ((IOdiDataServerFinder) odiInstance.getTransactionalEntityManager().getFinder(OdiDataServer.class)).findByName(ODI_DATA_SERVER);
 String repoUrl =  odiRepoDataServer.getConnectionSettings().getJdbcUrl();
-String repoDriver =  "oracle.jdbc.OracleDriver";
+String repoDriver =  odiRepoDataServer.getConnectionSettings().getDriverName();
 String repoUsername = odiRepoDataServer.getUsername();
-String repoPassword = null;
+String repoPassword = DwgObject.snpsDecypher(odiRepoDataServer.getPassword().toString());
 String workrepName='BIAPPS_WORKREP';
-String odiUsername='';
-String odiPassword='';
+String odiUsername= ((IOdiDataServerFinder) odiInstance.getTransactionalEntityManager().getFinder(OdiDataServer.class)).findByName(odiUserConnectionDetailsDataServerName).getUsername();
+String odiPassword= DwgObject.snpsDecypher(((IOdiDataServerFinder) odiInstance.getTransactionalEntityManager().getFinder(OdiDataServer.class)).findByName(odiUserConnectionDetailsDataServerName).getPassword().toString());
 SimpleOdiInstanceHandle MyOdiInstanceHandle = null;
-
-switch (repoUrl.split(':')[-1]){
-	case 'biststrp':
-		repoPassword = 'ucb1s1sth3sm2rt3st_odirepo';
-		odiUsername='biappsadmin';		
-		odiPassword='ucb1s1sth3b0ss1nh3r3';
-		break;
-	case 'bisdevrp':
-		repoPassword = 'ucb1s1sth3sm2rt3st_odirepo';
-		odiUsername='biappsadmin';		
-		odiPassword='ucb1s1sth3sm2rt3st';
-		break;
-	case 'bisqarp':
-		repoPassword = 'oyQgNlXFTMg9KFfM505g';
-		odiUsername='biappsadmin';		
-		odiPassword='rcw32oKAZBONtkcraIlK';
-		break;
-}
 
 try {
 
@@ -112,12 +95,14 @@ try {
 	deleteTriesLimit =1 
 	while (deleteTries < deleteTriesLimit)
 	{	
-	
-		
+		progressIterCount = 0
 		objectImportResultMap.each {
 		importObject ->
 			//Open a new instance and delete object 
-
+			progressIterCount++ 
+			
+			println progressIterCount +"/"+ objectImportResultMap.size()+" Trying to find the object " + importObject.value.srcFolderName 
+			
 			MyOdiInstanceHandle = SimpleOdiInstanceHandle
 					.create(repoUrl,  //JDBC driver URL
 					repoDriver,  //Driver
@@ -162,69 +147,7 @@ try {
 		deleteTries++;
 	}
 	//tm.commit(txnStatus)
-/*
-    
-    //Create the smart export service
-    ISmartExportService smartExpSvc = new SmartExportServiceImpl(odiInstance);
-    Collection < OdiFolder > allFoldersMatchedByName = new LinkedList();
 
-    //SDK Folder Objects
-    //We create a map from objectImportResultMap contains expando object for each value entry
-    //Expando object stores the naame of the folder given in the input file 
-	//each matched object
-	//a final object which qualifies i.e. 
-    objectImportResultMap.each {
-        tempObject ->
-            Collection < OdiFolder > tempCollection = ((IOdiFolderFinder) odiInstance.getTransactionalEntityManager().getFinder(OdiFolder.class)).findByName(tempObject.value.srcFolderName, PROJECT_CODE);
-        allFoldersMatchedByName.addAll(tempCollection);
-		//Add all the matched folders to the 
-        objectImportResultMap[tempObject.value.srcFolderName].objectsMatchedbyName = tempCollection;
-		objectImportResultMap[tempObject.value.srcFolderName].objectsMatchedbyName.each {
-        matchedObject ->
-            if (matchedObject.getParentFolder().getName().startsWith("CUSTOM")) {
-				objectImportResultMap[tempObject.value.srcFolderName].qualifiedObject = matchedObject
-            }
-    };
-		
-    }
-    //export all objects in the map
-    objectImportResultMap.each {
-        exportObject ->
-        if (exportObject.value.qualifiedObject) {
-			tempList = new LinkedList();
-			tempList.add(exportObject.value.qualifiedObject);
-			println "Exporting: " + exportObject.value.qualifiedObject 
-			try {
-				//smartExpSvc.exportToXml(tempList,exportFolderName,exportObject.value.exportFileName,true,false,encodeOptions,false,null);
-				exportObject.value.result = "Export Successful"
-				exportObject.value.exportedSuccessfully =true
-				exportObject.value.internalId = exportObject.value.qualifiedObject.getInternalId()
-			}
-			catch (Exception e){
-				exportObject.value.exportedSuccessfully =false
-				exportObject.value.result = "Found the object unable to export see exception"
-				throw e;
-			}
-		}
-		else
-		{
-			println "Unable to find: " + exportObject.value.srcFolderName 
-			exportObject.value.result = "Unable to find the object"
-			exportObject.value.exportedSuccessfully =false
-		}
-    }
-	println "Export Complete: " +  new Date();
-	
-	println "Result: \n\t" + objectImportResultMap
-    //Commit transaction, Close Authentication and ODI Instance
-    tm.commit(txnStatus);
-    objectImportResultMap.each {
-		exportObject ->
-		exportMetaDataFile.append exportObject.value.srcFolderName+','+exportObject.value.exportedSuccessfully+','+exportObject.value.exportFileName+','+exportObject.value.internalId+','+exportObject.value.result+','+exportStartTime+System.getProperty("line.separator")
-			
-			;
-	}
-*/	
 } catch (Exception e) {
 
     //Commit transaction, Close Authentication and ODI Instance in Exception Block
@@ -238,4 +161,5 @@ finally {
 //if running externally close auth and instance here
 //auth.close();
 //odiInstance.close();
+println "Ending Process: " + new Date()
 }
