@@ -25,15 +25,17 @@ import oracle.odi.domain.topology.finder.IOdiDataServerFinder;
 import oracle.odi.publicapi.samples.SimpleOdiInstanceHandle;
 import oracle.odi.impexp.smartie.impl.SmartImportServiceImpl;
 import oracle.odi.impexp.smartie.ISmartImportService;
+import com.sunopsis.dwg.DwgObject as DwgObject;
 
 
 Logger logger = Logger.getLogger("")
-logger.info("I am a test info log")
+//logger.info("I am a test info log")
 String PROJECT_CODE = 'BIAPPS';
 String ODI_DATA_SERVER = 'OBIA_BIA_ODIREPO';
+String odiUserConnectionDetailsDataServerName = 'UC_ADMIN_ODI_CONNECTION';
 String exportFolderName = 'C:\\Users\\arjunl\\Documents\\odi\\odi_sdk_automationtest\\';
 String exportMetaDataFileName = 'C:\\Users\\arjunl\\Documents\\odi\\odi_sdk_automationtest\\ExportMetaData3.dat';
-Date exportStartTime = new Date();
+Date processStartTime = new Date();
 
 //Create file for exporting metadata
 def exportMetaDataFile = new File(exportMetaDataFileName);
@@ -42,36 +44,19 @@ EncodingOptions encodeOptions = new EncodingOptions();
 def objectImportResultMap = new HashMap < String, Expando > ();
 def objectImportInput = new Expando()
 
-println "Starting Process: " + exportStartTime
+println "Starting Process: " + processStartTime
 
 OdiDataServer odiRepoDataServer = ((IOdiDataServerFinder) odiInstance.getTransactionalEntityManager().getFinder(OdiDataServer.class)).findByName(ODI_DATA_SERVER);
 String repoUrl =  odiRepoDataServer.getConnectionSettings().getJdbcUrl();
-String repoDriver =  "oracle.jdbc.OracleDriver";
+String repoDriver =  odiRepoDataServer.getConnectionSettings().getDriverName();
 String repoUsername = odiRepoDataServer.getUsername();
-String repoPassword = null;
+String repoPassword = DwgObject.snpsDecypher(odiRepoDataServer.getPassword().toString());
 String workrepName='BIAPPS_WORKREP';
-String odiUsername='';
-String odiPassword='';
+String odiUsername= ((IOdiDataServerFinder) odiInstance.getTransactionalEntityManager().getFinder(OdiDataServer.class)).findByName(odiUserConnectionDetailsDataServerName).getUsername();
+String odiPassword= DwgObject.snpsDecypher(((IOdiDataServerFinder) odiInstance.getTransactionalEntityManager().getFinder(OdiDataServer.class)).findByName(odiUserConnectionDetailsDataServerName).getPassword().toString());
 SimpleOdiInstanceHandle MyOdiInstanceHandle = null;
 ISmartImportService smartImpSvc =null;
 
-switch (repoUrl.split(':')[-1]){
-	case 'biststrp':
-		repoPassword = 'ucb1s1sth3sm2rt3st_odirepo';
-		odiUsername='biappsadmin';		
-		odiPassword='ucb1s1sth3b0ss1nh3r3';
-		break;
-	case 'bisdevrp':
-		repoPassword = 'ucb1s1sth3sm2rt3st_odirepo';
-		odiUsername='biappsadmin';		
-		odiPassword='ucb1s1sth3sm2rt3st';
-		break;
-	case 'bisqarp':
-		repoPassword = 'oyQgNlXFTMg9KFfM505g';
-		odiUsername='biappsadmin';		
-		odiPassword='rcw32oKAZBONtkcraIlK';
-		break;
-}
 
 try {
 
@@ -110,17 +95,13 @@ try {
     ITransactionStatus txnStatus = tm.getTransaction(txnDef);
 	OdiFolder tempOdiFolderObj =null;
 	
-	int deleteTries = 0;
-	deleteSuccess = false;
-	deleteTriesLimit =1 
-	while (deleteTries < deleteTriesLimit)
-	{	
 	
-		
+	
+		progressIterCount = 0
 		objectImportResultMap.each {
 		importObject ->
-			//Open a new instance and delete object 
-
+			//Open a new instance and import the object 
+			progressIterCount++ 
 			MyOdiInstanceHandle = SimpleOdiInstanceHandle
 					.create(repoUrl,  //JDBC driver URL
 					repoDriver,  //Driver
@@ -138,9 +119,9 @@ try {
 
 					try 
 					{
-						println "Trying to import object " + importObject.value.exportFileName 
+						println progressIterCount +"/"+ objectImportResultMap.size()+" Trying to import object " + importObject.value.exportFileName 
 						smartImpSvc.importFromXml(importObject.value.exportFileName)
-						//tempTm.commit(tempTxnStatus)
+						tempTm.commit(tempTxnStatus)
 						println "Imported successfully: " + importObject.value.exportFileName
 					}
 					catch (e)
@@ -154,15 +135,15 @@ try {
 				
 			MyOdiInstanceHandle.release();
 			println "Released instance handle"
-			//Delete and close the connection
+			//Close the connection used for import
 		}
-		deleteTries++;
-	}
+		
+	
 	//tm.commit(txnStatus)
 
 	} catch (Exception e) {
 
-    //Commit transaction, Close Authentication and ODI Instance in Exception Block
+    //Commit transaction, Close Authentication and ODI Instance in Exception Block if not used via odi studio
 
     //auth.close();
     //odiInstance.close();
@@ -173,4 +154,5 @@ finally {
 //if running externally close auth and instance here
 //auth.close();
 //odiInstance.close();
+println "Ending Process: " + new Date()
 }
