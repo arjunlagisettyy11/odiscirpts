@@ -23,8 +23,20 @@ import java.util.logging.Logger
 Logger logger = Logger.getLogger("")
 logger.info("I am a test info log")
 String PROJECT_CODE = 'BIAPPS';
-String folderListFile = 'C:\\Users\\arjunl\\Documents\\odi\\folderlist.txt';
-String exportFolderName = 'C:\\Users\\arjunl\\Documents\\odi\\odi_sdk_automationtest\\';
+
+boolean SIMULATE = false;
+
+println this.args
+String exportFolderName = /\\tank.uchicago.edu\NSIT Core Services\devel\BIS-New\Published\AIS -SIA\Productioniozation\R7_B6/
+String folderlist = null;
+
+println exportFolderName
+if (exportFolderName == null )
+	{ 
+		throw new Exception("No Folder name set")
+	}
+folderlist  = (folderlist != null) ? folderlist : /folderlist.txt/;
+folderListFile = exportFolderName +System.getProperty("file.separator")+ folderlist;
 Date exportStartTime = new Date();
 
 //Create file for exporting metadata
@@ -87,7 +99,9 @@ try {
 			tempList.add(exportObject.value.qualifiedObject);
 			println "Exporting: " + exportObject.value.qualifiedObject 
 			try {
-				//smartExpSvc.exportToXml(tempList,exportFolderName,exportObject.value.exportFileName,true,false,encodeOptions,false,null);
+				if (SIMULATE == false) {
+					smartExpSvc.exportToXml(tempList,exportFolderName,exportObject.value.exportFileName,true,false,encodeOptions,false,null);
+				}
 				exportObject.value.result = "Export Successful"
 				exportObject.value.exportedSuccessfully =true
 				exportObject.value.internalId = exportObject.value.qualifiedObject.getInternalId()
